@@ -48,7 +48,7 @@ st.markdown("""
 col1, col2 = st.columns([1, 1])
 with col1:
     st.title("📊 Estrategia TeleVía 2026")
-    st.subtitle("Crecimiento de Aforos + Captura de Mercado vs PASE")
+    st.subheader("Crecimiento de Aforos + Captura de Mercado vs PASE")
 
 with col2:
     # Selector de idioma
