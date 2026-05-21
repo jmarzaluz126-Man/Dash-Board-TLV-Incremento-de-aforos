@@ -1,13 +1,3 @@
-cat > /mnt/user-data/outputs/streamlit_app/requirements.txt << 'EOF'
-streamlit==1.37.0
-pandas==2.2.0
-numpy==1.24.3
-plotly==5.18.0
-openpyxl==3.10.10
-EOF
-cat /mnt/user-data/outputs/streamlit_app/requirements.txt
-Salida
-
 streamlit==1.37.0
 pandas==2.2.0
 numpy==1.24.3
