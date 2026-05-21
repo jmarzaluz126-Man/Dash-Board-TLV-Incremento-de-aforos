@@ -436,7 +436,6 @@ def build_opportunities(diag_df):
         return diag_df
 
     work = diag_df.copy()
-    # Asegurar que las columnas necesarias existan
     required_cols = ["aforo", "rpc", "aforo_yoy", "volatility", "pase_share", "televia_share"]
     for col in required_cols:
         if col not in work.columns:
@@ -558,6 +557,14 @@ with st.sidebar:
         float(SIMULATION_DEFAULTS["rpc_uplift_pct"]),
         0.1,
     )
+    # Nuevo control para captura de SUS EN MIS hacia TeleVía
+    sim_sus_capture = st.slider(
+        "Captura de SUS EN MIS hacia TeleVía (%)",
+        0.0, 100.0,
+        0.0,
+        1.0,
+        help="Porcentaje de vehículos de otros operadores (SUS EN MIS) que se convierten a TeleVía."
+    )
 
 # -----------------------------------------------------------------------------
 # Filtering and derivations
@@ -673,7 +680,6 @@ family_pivot = (
     .pivot(index="concession", columns="family", values="aforo")
     .fillna(0)
 )
-# Asegurar que todas las familias necesarias existan
 for fam in CHANNEL_ORDER:
     if fam not in family_pivot.columns:
         family_pivot[fam] = 0
@@ -690,7 +696,7 @@ opportunities_df = build_opportunities(
     )
 )
 
-# normalize family share columns if present (ya están, pero por si acaso)
+# normalize family share columns if present
 for fam in ["TeleVía", "PASE", "CAPUFE/Exentos", "PINFRA", "SITEL", "EASYTRIP", "Otros", "Totales"]:
     if fam not in opportunities_df.columns:
         opportunities_df[fam] = 0
@@ -719,12 +725,13 @@ st.caption(
 # -----------------------------------------------------------------------------
 # Tabs
 # -----------------------------------------------------------------------------
-tab_home, tab_diag, tab_sim, tab_plan, tab_follow = st.tabs([
+tab_home, tab_diag, tab_sim, tab_plan, tab_follow, tab_interop = st.tabs([
     PAGE_TITLES["home"],
     PAGE_TITLES["diagnostico"],
     PAGE_TITLES["simulacion"],
     PAGE_TITLES["plan"],
     PAGE_TITLES["seguimiento"],
+    "Interoperabilidad y Captura",  # Nueva pestaña
 ])
 
 # -----------------------------------------------------------------------------
@@ -959,8 +966,35 @@ with tab_diag:
                 height=340,
             )
 
+    # ----- Alertas de fuga (a nivel portafolio anual) -----
+    st.markdown("#### Alertas de fuga de tráfico propio")
+    if not hoja2_df.empty:
+        # Calcular ratio de fuga = MIS EN SUS / MIS EN MIS
+        hoja2_df["fuga_ratio"] = hoja2_df["mis_en_sus_aforo"] / hoja2_df["mis_en_mis_aforo"].replace(0, np.nan)
+        # Mostrar años donde ratio > 0.3
+        fuga_alerta = hoja2_df[hoja2_df["fuga_ratio"] > 0.3].copy()
+        if not fuga_alerta.empty:
+            st.warning("Se detectaron años con alta fuga de tráfico propio (ratio > 0.3).")
+            fuga_table = fuga_alerta[["periodo", "mis_en_mis_aforo", "mis_en_sus_aforo", "fuga_ratio"]].copy()
+            fuga_table.columns = ["Año", "Aforo MIS EN MIS", "Aforo MIS EN SUS", "Ratio fuga"]
+            st.dataframe(
+                fuga_table.style.format({
+                    "Aforo MIS EN MIS": "{:,.0f}",
+                    "Aforo MIS EN SUS": "{:,.0f}",
+                    "Ratio fuga": "{:.2%}",
+                }),
+                use_container_width=True,
+                height=200,
+                hide_index=True,
+            )
+            st.info("**Sugerencia:** Implementar campañas de retención y mejorar beneficios de TeleVía para reducir la fuga.")
+        else:
+            st.success("No se detectaron años con fuga significativa (ratio <= 0.3).")
+    else:
+        st.info("No hay datos de interoperabilidad (Hoja2) para calcular fuga.")
+
 # -----------------------------------------------------------------------------
-# 3) Simulation
+# 3) Simulation (mejorada con captura de SUS EN MIS)
 # -----------------------------------------------------------------------------
 with tab_sim:
     st.subheader("Simulación")
@@ -979,42 +1013,67 @@ with tab_sim:
         base_ingreso = sim_base["ingreso"].sum()
         base_rpc = safe_divide(base_ingreso, base_aforo)
 
+        # Obtener volumen de SUS EN MIS para el año seleccionado (desde hoja2_df)
+        sus_volumen = 0
+        if not hoja2_df.empty and sim_target == "Portafolio completo":
+            año_actual = selected_year if year_choice != "Todos" else annual_all["year"].max()
+            año_row = hoja2_df[hoja2_df["periodo"] == str(año_actual)]
+            if not año_row.empty:
+                sus_volumen = año_row.iloc[0]["sus_en_mis_aforo"]
+        else:
+            # Para concesión individual, estimar usando su participación en el aforo total del año
+            if sim_target != "Portafolio completo" and not hoja2_df.empty:
+                año_actual = selected_year if year_choice != "Todos" else annual_all["year"].max()
+                año_row = hoja2_df[hoja2_df["periodo"] == str(año_actual)]
+                if not año_row.empty:
+                    total_aforo_anual = raw_df[raw_df["year"] == año_actual]["aforo"].sum()
+                    if total_aforo_anual > 0:
+                        participacion = base_aforo / total_aforo_anual
+                        sus_volumen = año_row.iloc[0]["sus_en_mis_aforo"] * participacion
+
+        # Mostrar métricas base
         c1, c2, c3 = st.columns(3)
         c1.metric("Base aforo", fmt_num(base_aforo))
         c2.metric("Base ingreso", fmt_mxn(base_ingreso))
         c3.metric("Ingreso / cruce", f"{base_rpc:.2f}" if pd.notna(base_rpc) else "-")
 
-        sim_cols = st.columns(3)
-        with sim_cols[0]:
-            st.markdown("##### Crecimiento de volumen")
-            st.write(f"{sim_volume_growth:.1f}%")
-        with sim_cols[1]:
-            st.markdown("##### Captura de share")
-            st.write(f"{sim_share_capture:.1f} pp")
-        with sim_cols[2]:
-            st.markdown("##### Mejora ingreso/cruce")
-            st.write(f"{sim_rpc_uplift:.1f}%")
+        st.markdown("#### Escenario con captura de SUS EN MIS")
+        st.write(f"**Volumen SUS EN MIS a capturar:** {fmt_num(sus_volumen)} (estimado para {sim_target})")
+        capture_percent = sim_sus_capture / 100.0
+        captured_volume = sus_volumen * capture_percent
 
-        extra_aforo = base_aforo * (sim_volume_growth / 100.0)
-        capture_aforo = base_aforo * (sim_share_capture / 100.0)
-        scenario_aforo = base_aforo + extra_aforo + capture_aforo
-        scenario_rpc = base_rpc * (1 + sim_rpc_uplift / 100.0) if pd.notna(base_rpc) else np.nan
-        scenario_ingreso = scenario_aforo * scenario_rpc if pd.notna(scenario_rpc) else np.nan
+        # RPC de TeleVía en la base seleccionada
+        televia_df = sim_base[sim_base["family"] == "TeleVía"]
+        televia_rpc = safe_divide(televia_df["ingreso"].sum(), televia_df["aforo"].sum()) if not televia_df.empty else base_rpc
+        st.caption(f"RPC promedio de TeleVía en la base: {televia_rpc:.2f}")
 
-        delta_aforo = scenario_aforo - base_aforo
-        delta_ingreso = scenario_ingreso - base_ingreso if pd.notna(scenario_ingreso) else np.nan
+        # Nuevo ingreso por la captura (se asume que los vehículos capturados pagan tarifa de TeleVía)
+        new_ingreso_captura = captured_volume * televia_rpc
+        # El aforo total no cambia (los vehículos ya estaban contados), pero el ingreso sí
+        scenario_ingreso = base_ingreso + new_ingreso_captura
+        scenario_aforo = base_aforo  # sin cambio
+        scenario_rpc = safe_divide(scenario_ingreso, scenario_aforo)
 
-        st.markdown("##### Resumen del escenario")
+        # Nuevo market share de TeleVía
+        base_televia_aforo = televia_df["aforo"].sum()
+        new_televia_aforo = base_televia_aforo + captured_volume
+        new_televia_share = new_televia_aforo / scenario_aforo if scenario_aforo > 0 else 0
+        base_televia_share = base_televia_aforo / base_aforo if base_aforo > 0 else 0
+
+        delta_ingreso = scenario_ingreso - base_ingreso
+
+        st.markdown("##### Resultados del escenario")
         scen_df = pd.DataFrame([
-            {"Métrica": "Base", "Aforo": base_aforo, "Ingreso": base_ingreso, "Ingreso/cruce": base_rpc},
-            {"Métrica": "Escenario", "Aforo": scenario_aforo, "Ingreso": scenario_ingreso, "Ingreso/cruce": scenario_rpc},
-            {"Métrica": "Delta", "Aforo": delta_aforo, "Ingreso": delta_ingreso, "Ingreso/cruce": (scenario_rpc - base_rpc) if pd.notna(scenario_rpc) else np.nan},
+            {"Métrica": "Base", "Aforo": base_aforo, "Ingreso": base_ingreso, "Ingreso/cruce": base_rpc, "Share TeleVía": base_televia_share},
+            {"Métrica": "Escenario", "Aforo": scenario_aforo, "Ingreso": scenario_ingreso, "Ingreso/cruce": scenario_rpc, "Share TeleVía": new_televia_share},
+            {"Métrica": "Delta", "Aforo": scenario_aforo - base_aforo, "Ingreso": delta_ingreso, "Ingreso/cruce": scenario_rpc - base_rpc, "Share TeleVía": new_televia_share - base_televia_share},
         ])
         st.dataframe(
             scen_df.style.format({
                 "Aforo": "{:,.0f}",
                 "Ingreso": "${:,.0f}",
                 "Ingreso/cruce": "{:,.2f}",
+                "Share TeleVía": "{:.1%}",
             }),
             use_container_width=True,
             height=220,
@@ -1022,15 +1081,40 @@ with tab_sim:
         )
 
         fig = go.Figure()
-        fig.add_bar(name="Base", x=["Aforo", "Ingreso"], y=[base_aforo, base_ingreso], marker_color=COLORS["muted"])
-        fig.add_bar(name="Escenario", x=["Aforo", "Ingreso"], y=[scenario_aforo, scenario_ingreso], marker_color=COLORS["televia"])
-        fig.update_layout(barmode="group", legend_title_text="")
+        fig.add_bar(name="Base", x=["Aforo", "Ingreso", "Share TeleVía"], y=[base_aforo, base_ingreso, base_televia_share], marker_color=COLORS["muted"])
+        fig.add_bar(name="Escenario", x=["Aforo", "Ingreso", "Share TeleVía"], y=[scenario_aforo, scenario_ingreso, new_televia_share], marker_color=COLORS["televia"])
+        fig.update_layout(barmode="group", legend_title_text="", yaxis_title="Valor")
         st.plotly_chart(make_bar_config(fig, height=420), use_container_width=True)
 
         st.markdown("##### Lectura de palancas")
-        st.write(f"- **{sim_target}** puede sumar **{fmt_num(delta_aforo)} cruces** bajo el supuesto actual.")
-        st.write(f"- El ingreso estimado subiría en **{fmt_mxn(delta_ingreso)}** si mejora el ingreso/cruce.")
-        st.write("- Usa este bloque para probar escenarios antes de pedir presupuesto o compromisos comerciales.")
+        st.write(f"- Capturando el **{sim_sus_capture:.1f}%** de los vehículos SUS EN MIS, se incrementa el ingreso en **{fmt_mxn(delta_ingreso)}**.")
+        st.write(f"- El share de TeleVía aumenta de **{base_televia_share:.1%}** a **{new_televia_share:.1%}**.")
+        st.write("- Ajusta el porcentaje de captura en la barra lateral para explorar distintos escenarios.")
+
+        # También mantener la simulación original (crecimiento de volumen, etc.) - opcional
+        st.markdown("#### Simulación adicional (crecimiento de volumen y mejora de RPC)")
+        extra_aforo = base_aforo * (sim_volume_growth / 100.0)
+        capture_aforo = base_aforo * (sim_share_capture / 100.0)
+        scenario_aforo2 = base_aforo + extra_aforo + capture_aforo
+        scenario_rpc2 = base_rpc * (1 + sim_rpc_uplift / 100.0) if pd.notna(base_rpc) else np.nan
+        scenario_ingreso2 = scenario_aforo2 * scenario_rpc2 if pd.notna(scenario_rpc2) else np.nan
+        delta_aforo2 = scenario_aforo2 - base_aforo
+        delta_ingreso2 = scenario_ingreso2 - base_ingreso if pd.notna(scenario_ingreso2) else np.nan
+
+        st.dataframe(
+            pd.DataFrame([
+                {"Métrica": "Base", "Aforo": base_aforo, "Ingreso": base_ingreso, "Ingreso/cruce": base_rpc},
+                {"Métrica": "Escenario (crec. + share)", "Aforo": scenario_aforo2, "Ingreso": scenario_ingreso2, "Ingreso/cruce": scenario_rpc2},
+                {"Métrica": "Delta", "Aforo": delta_aforo2, "Ingreso": delta_ingreso2, "Ingreso/cruce": (scenario_rpc2 - base_rpc) if pd.notna(scenario_rpc2) else np.nan},
+            ]).style.format({
+                "Aforo": "{:,.0f}",
+                "Ingreso": "${:,.0f}",
+                "Ingreso/cruce": "{:,.2f}",
+            }),
+            use_container_width=True,
+            height=180,
+            hide_index=True,
+        )
 
 # -----------------------------------------------------------------------------
 # 4) Action plan
@@ -1182,6 +1266,116 @@ with tab_follow:
         "Cuando agregues otro Excel con la misma estructura, la lógica de parseo se conserva. "
         "Solo cambia el archivo en el repositorio y el dashboard recalcula los bloques."
     )
+
+# -----------------------------------------------------------------------------
+# 6) Interoperabilidad y Captura (nueva pestaña)
+# -----------------------------------------------------------------------------
+with tab_interop:
+    st.subheader("Análisis de interoperabilidad y potencial de captura")
+
+    if hoja2_df.empty:
+        st.warning("No se encontraron datos en la hoja 'Hoja2'. No es posible mostrar el análisis de interoperabilidad.")
+    else:
+        # Preparar datos anuales
+        hoja2_clean = hoja2_df.copy()
+        hoja2_clean["año"] = hoja2_clean["periodo"].astype(str)
+        # Calcular share de TeleVía en MIS EN MIS usando raw_df
+        televia_shares = []
+        for idx, row in hoja2_clean.iterrows():
+            año = row["periodo"]
+            # Intentar convertir a entero
+            try:
+                año_int = int(año)
+            except:
+                año_int = None
+            if año_int is not None:
+                total_aforo_anual = raw_df[raw_df["year"] == año_int]["aforo"].sum()
+                televia_aforo = raw_df[(raw_df["year"] == año_int) & (raw_df["family"] == "TeleVía")]["aforo"].sum()
+                share = safe_divide(televia_aforo, total_aforo_anual)
+            else:
+                share = np.nan
+            televia_shares.append(share)
+        hoja2_clean["share_televia_mis_en_mis"] = televia_shares
+
+        # Potencial de captura: asumimos que actualmente el share de TeleVía en SUS EN MIS es 10% (conservador)
+        share_sus_actual = 0.10
+        hoja2_clean["potencial_captura_aforo"] = hoja2_clean["sus_en_mis_aforo"] * (1 - share_sus_actual)
+        hoja2_clean["potencial_captura_ingreso"] = hoja2_clean["potencial_captura_aforo"] * (hoja2_clean["share_televia_mis_en_mis"] * (hoja2_clean["mis_en_mis_ingreso"] / hoja2_clean["mis_en_mis_aforo"]).fillna(0))
+
+        # Indicador de fuga
+        hoja2_clean["fuga_ratio"] = hoja2_clean["mis_en_sus_aforo"] / hoja2_clean["mis_en_mis_aforo"].replace(0, np.nan)
+
+        st.markdown("#### Tabla de flujos anuales")
+        display_cols = ["año", "mis_en_mis_aforo", "mis_en_sus_aforo", "sus_en_mis_aforo", "share_televia_mis_en_mis", "fuga_ratio", "potencial_captura_aforo"]
+        st.dataframe(
+            hoja2_clean[display_cols].rename(columns={
+                "año": "Año",
+                "mis_en_mis_aforo": "MIS EN MIS (aforo)",
+                "mis_en_sus_aforo": "MIS EN SUS (aforo)",
+                "sus_en_mis_aforo": "SUS EN MIS (aforo)",
+                "share_televia_mis_en_mis": "Share TeleVía en MIS EN MIS",
+                "fuga_ratio": "Ratio fuga (MIS EN SUS / MIS EN MIS)",
+                "potencial_captura_aforo": "Potencial captura SUS EN MIS (aforo)",
+            }).style.format({
+                "MIS EN MIS (aforo)": "{:,.0f}",
+                "MIS EN SUS (aforo)": "{:,.0f}",
+                "SUS EN MIS (aforo)": "{:,.0f}",
+                "Share TeleVía en MIS EN MIS": "{:.1%}",
+                "Ratio fuga (MIS EN SUS / MIS EN MIS)": "{:.2%}",
+                "Potencial captura SUS EN MIS (aforo)": "{:,.0f}",
+            }),
+            use_container_width=True,
+            height=320,
+            hide_index=True,
+        )
+
+        st.markdown("#### Gráfico de barras apiladas de flujos anuales")
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(x=hoja2_clean["año"], y=hoja2_clean["mis_en_mis_aforo"], name="MIS EN MIS", marker_color=COLORS["televia"]))
+        fig_bar.add_trace(go.Bar(x=hoja2_clean["año"], y=hoja2_clean["mis_en_sus_aforo"], name="MIS EN SUS", marker_color=COLORS["warning"]))
+        fig_bar.add_trace(go.Bar(x=hoja2_clean["año"], y=hoja2_clean["sus_en_mis_aforo"], name="SUS EN MIS", marker_color=COLORS["info"]))
+        fig_bar.update_layout(barmode="stack", xaxis_title="Año", yaxis_title="Aforo", legend_title="Flujo")
+        st.plotly_chart(make_bar_config(fig_bar, height=450), use_container_width=True)
+
+        st.markdown("#### Diagrama Sankey de flujos")
+        # Selector de año para Sankey
+        año_sankey = st.selectbox("Selecciona un año para el diagrama Sankey", hoja2_clean["año"].unique(), key="sankey_year")
+        sankey_data = hoja2_clean[hoja2_clean["año"] == año_sankey].iloc[0]
+        # Nodos: Origen y destino: MIS y SUS
+        labels = ["MIS", "SUS"]
+        # Fuentes: 0=MIS, 1=SUS
+        source = [0, 0, 1]  # MIS->MIS, MIS->SUS, SUS->MIS
+        target = [0, 1, 0]
+        values = [
+            sankey_data["mis_en_mis_aforo"],
+            sankey_data["mis_en_sus_aforo"],
+            sankey_data["sus_en_mis_aforo"]
+        ]
+        fig_sankey = go.Figure(data=[go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                line=dict(color="black", width=0.5),
+                label=labels,
+                color=[COLORS["televia"], COLORS["info"]]
+            ),
+            link=dict(
+                source=source,
+                target=target,
+                value=values,
+                color=[COLORS["televia"], COLORS["warning"], COLORS["info"]]
+            )
+        )])
+        fig_sankey.update_layout(title=f"Flujos de tráfico {año_sankey}", height=500)
+        st.plotly_chart(fig_sankey, use_container_width=True)
+
+        st.markdown("#### Interpretación")
+        st.info(
+            "**MIS EN MIS**: Vehículos de la propia concesionaria que usan sus propios carriles.\n\n"
+            "**MIS EN SUS**: Vehículos propios que transitan por carriles de otros operadores (fuga).\n\n"
+            "**SUS EN MIS**: Vehículos de otros operadores que usan nuestras autopistas (oportunidad de captura).\n\n"
+            "**Potencial de captura**: Representa el volumen de SUS EN MIS que aún no usa TeleVía. Convertirlos aumentaría el share y el ingreso."
+        )
 
 # -----------------------------------------------------------------------------
 # Footer
