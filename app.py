@@ -458,14 +458,7 @@ def build_opportunities(diag_df):
             return ACTION_LIBRARY["monetization"]["label"], "Ingreso por cruce por debajo del benchmark."
         if pd.notna(row["volatility"]) and row["volatility"] > work["volatility"].median():
             return ACTION_LIBRARY["stabilization"]["label"], "Alta variabilidad mensual."
-        def recommend(row):
-    pase_share = row.get("pase_share", np.nan)
-    televia_share = row.get("televia_share", np.nan)
-    if pd.notna(pase_share) and pase_share > 0.20:
-        return "Oportunidad PASE"
-    if pd.notna(televia_share) and televia_share < 0.30:
-        return "Potencial TeleVía"
-    return "OK"
+        if pd.notna(row["pase_share"]) and row["pase_share"] > 0.20:
             return ACTION_LIBRARY["channel_capture"]["label"], "Participación PASE relevante; oportunidad de captura."
         if pd.notna(row["televia_share"]) and row["televia_share"] < 0.25 and row["aforo"] >= work["aforo"].median():
             return ACTION_LIBRARY["premium_mix"]["label"], "Mix TeleVía bajo para una base relevante."
@@ -634,8 +627,7 @@ conc_year = (
     .sort_values("aforo", ascending=False)
 )
 conc_year["rpc"] = conc_year["ingreso"] / conc_year["aforo"].replace(0, np.nan)
-total_aforo = conc_year["aforo"].sum()
-conc_year["share_aforo"] = conc_year["aforo"].apply(lambda x: safe_divide(x, total_aforo))
+conc_year["share_aforo"] = conc_year["aforo"] / conc_year["aforo"].sum().replace(0, np.nan)
 conc_year["aforo_rank"] = np.arange(1, len(conc_year) + 1)
 
 prev_conc = (
@@ -660,8 +652,7 @@ family_year = (
     .agg(aforo=("aforo", "sum"), ingreso=("ingreso", "sum"))
     .sort_values("aforo", ascending=False)
 )
-total_family = family_year["aforo"].sum()
-family_year["share"] = family_year["aforo"] / total_family if total_family else np.nan
+family_year["share"] = family_year["aforo"] / family_year["aforo"].sum().replace(0, np.nan)
 
 heatmap_df = build_heatmap(analysis_df, selected_year)
 opportunities_df = build_opportunities(
@@ -1192,3 +1183,4 @@ st.markdown(
     f"</div>",
     unsafe_allow_html=True,
 )
+
