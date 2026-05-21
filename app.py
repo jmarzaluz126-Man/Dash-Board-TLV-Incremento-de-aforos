@@ -627,7 +627,8 @@ conc_year = (
     .sort_values("aforo", ascending=False)
 )
 conc_year["rpc"] = conc_year["ingreso"] / conc_year["aforo"].replace(0, np.nan)
-conc_year["share_aforo"] = conc_year["aforo"] / conc_year["aforo"].sum().replace(0, np.nan)
+total_aforo = conc_year["aforo"].sum()
+conc_year["share_aforo"] = conc_year["aforo"].apply(lambda x: safe_divide(x, total_aforo))
 conc_year["aforo_rank"] = np.arange(1, len(conc_year) + 1)
 
 prev_conc = (
