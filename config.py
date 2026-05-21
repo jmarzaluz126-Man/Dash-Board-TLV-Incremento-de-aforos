@@ -1,154 +1,119 @@
-APP_TITLE = "TeleVía | Decision Dashboard"
-APP_SUBTITLE = "Aforo, ingreso, captura de mercado y simulación de crecimiento"
+# config.py
 
-EXCEL_FILE = "dashboard_televia.xlsx"
+# -----------------------------------------------------------------------------
+# App metadata
+# -----------------------------------------------------------------------------
+APP_TITLE = "Dashboard TeleVía - Incremento de Aforos"
+APP_SUBTITLE = "Plataforma de Decision Intelligence para crecimiento de market share"
 
+# -----------------------------------------------------------------------------
+# File paths
+# -----------------------------------------------------------------------------
+EXCEL_FILE = "dashboard_televia.xlsx"   # Cambia si tu archivo tiene otro nombre
+
+# -----------------------------------------------------------------------------
+# Page titles (usadas en st.tabs)
+# -----------------------------------------------------------------------------
 PAGE_TITLES = {
-    "home": "1. Executive Summary",
-    "diagnostico": "2. Diagnóstico",
-    "simulacion": "3. Simulación",
-    "plan": "4. Plan de acción",
-    "seguimiento": "5. Seguimiento",
+    "home": "🎯 Control Tower",
+    "diagnostico": "🔍 Diagnóstico Causal",
+    "simulacion": "🧪 Simulador",
+    "plan": "💰 Portafolio Oportunidades",
+    "seguimiento": "📈 Seguimiento",
 }
 
-MONTHS = [
-    "ENERO",
-    "FEBRERO",
-    "MARZO",
-    "ABRIL",
-    "MAYO",
-    "JUNIO",
-    "JULIO",
-    "AGOSTO",
-    "SEPTIEMBRE",
-    "OCTUBRE",
-    "NOVIEMBRE",
-    "DICIEMBRE",
-]
-
-MONTH_MAP = {m: i + 1 for i, m in enumerate(MONTHS)}
-
+# -----------------------------------------------------------------------------
+# Color palette (estilo corporativo)
+# -----------------------------------------------------------------------------
 COLORS = {
-    "televia": "#2E7D32",
-    "televia_light": "#A5D6A7",
-    "pase": "#757575",
-    "warning": "#F59E0B",
-    "danger": "#D32F2F",
-    "info": "#1976D2",
-    "success": "#16A34A",
-    "navy": "#1B2A4A",
-    "bg": "#F8FAFC",
-    "grid": "#E2E8F0",
-    "muted": "#64748B",
-    "white": "#FFFFFF",
-    "purple": "#7C3AED",
+    "navy": "#0A2B4E",
+    "televia": "#1E88E5",
+    "pase": "#43A047",
+    "info": "#00ACC1",
+    "warning": "#FFB300",
+    "danger": "#E53935",
+    "purple": "#8E24AA",
+    "muted": "#78909C",
+    "grid": "#E0E0E0",
 }
 
-# Grupos de canales para análisis y visualización.
-# La función de clasificación en app.py usa estas reglas en orden.
-CHANNEL_RULES = {
-    "TeleVía": [
-        "TELEVIA",
-        "PREPAGO",
-        "POST-PAGO",
-        "POSPAGO",
-        "DECENAL",
-        "I+D",
-        "MIS EN MIS",
-        "MIS EN SUS",
-        "SUS EN MIS",
-    ],
-    "PASE": [
-        "AUSUR (PASE)",
-        "AUSUR",
-        "CHAMAPA Y OTRAS (PASE)",
-        "CHAMAPA Y OTRAS",
-        "PASE",
-    ],
-    "CAPUFE/Exentos": [
-        "CAPUFE-BANOBRAS",
-        "CAPUFE-CD VALLES",
-        "CAPUFE-CHAMAPA",
-        "CAPUFE",
-        "CEP-SICE",
-        "EXENTOS",
-        "AUDI",
-        "OTRAS CAPUFE",
-        "OTRAS I+D",
-    ],
-    "PINFRA": [
-        "PINFRA (OSIPASS)",
-        "PINFRA",
-        "OTRAS PINFRA",
-    ],
-    "SITEL": [
-        "SITEL",
-        "OTRAS SITEL",
-    ],
-    "EASYTRIP": [
-        "EASYTRIP",
-    ],
-    "Otros": [],
-}
-
-CHANNEL_ORDER = [
-    "TeleVía",
-    "PASE",
-    "CAPUFE/Exentos",
-    "PINFRA",
-    "SITEL",
-    "EASYTRIP",
-    "Otros",
-    "Totales",
+# -----------------------------------------------------------------------------
+# Month mapping (para parseo de periodos)
+# -----------------------------------------------------------------------------
+MONTHS = [
+    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
 ]
 
-# Títulos que no representan una concesión operativa sino bloques de control/totalización.
+MONTH_MAP = {mes: i+1 for i, mes in enumerate(MONTHS)}
+
+# -----------------------------------------------------------------------------
+# Reglas de clasificación de canales en familias
+# -----------------------------------------------------------------------------
+CHANNEL_RULES = {
+    "TeleVía": ["PREPAGO", "POST-PAGO", "POSTPAGO", "DECENAL"],
+    "PASE": ["PASE", "AUSUR", "CHAMAPA"],
+    "CAPUFE/Exentos": ["CAPUFE", "EXENTOS"],
+    "PINFRA": ["PINFRA"],
+    "SITEL": ["SITEL"],
+    "EASYTRIP": ["EASYTRIP"],
+    "Otros": ["I+D", "AUDI", "OTRAS"],   # canales que no encajan directamente
+}
+# Nota: "Totales" se asigna automáticamente a agregados
+
+# Orden de familias para visualización
+CHANNEL_ORDER = ["TeleVía", "PASE", "CAPUFE/Exentos", "PINFRA", "SITEL", "EASYTRIP", "Otros", "Totales"]
+
+# -----------------------------------------------------------------------------
+# Exclusión de títulos de control (bloques que no son concesiones operativas)
+# -----------------------------------------------------------------------------
 EXCLUDE_TITLE_PATTERNS = [
     "ACUMULADO",
     "INTEROPERABILIDAD",
-    "TOTALES",
-    "TOTAL DE FACTURACION",
     "Trafico Total",
     "Trafico Facturable",
+    "AUSUR",
+    "CHAMAPA",
+    "CAPUFE-CHAMAPA",
+    "CEPSICE",
+    "EASYTRIP",
+    "SITEL",
+    "PINFRA",
+    "META",
+    "COTESA",
+    "VET",
+    "METLAPIL",
 ]
 
-SIMULATION_DEFAULTS = {
-    "volume_growth_pct": 5.0,
-    "share_capture_pp": 1.5,
-    "rpc_uplift_pct": 3.0,
-}
-
-MAX_TOP_OPPORTUNITIES = 12
-
-ACTION_LIBRARY = {
-    "volume_recovery": {
-        "label": "Recuperación de volumen",
-        "description": "La base es relevante, pero el aforo cayó vs. el año previo.",
-    },
-    "monetization": {
-        "label": "Monetización",
-        "description": "El ingreso por cruce está por debajo del benchmark.",
-    },
-    "stabilization": {
-        "label": "Estabilización",
-        "description": "La variabilidad mensual es alta y debe controlarse.",
-    },
-    "channel_capture": {
-        "label": "Captura de canal",
-        "description": "Hay oportunidad para ganar participación en canales clave.",
-    },
-    "premium_mix": {
-        "label": "Mix premium",
-        "description": "El mix puede migrar hacia canales de mayor valor.",
-    },
-    "benchmark": {
-        "label": "Replicar benchmark",
-        "description": "Hay una concesión líder que puede servir como referencia.",
-    },
-}
-
+# -----------------------------------------------------------------------------
+# Textos de ayuda (para el radio de alcance)
+# -----------------------------------------------------------------------------
 TEXT_HELP = {
     "scope_operational": "Solo concesiones operativas",
     "scope_all": "Incluir bloques de control",
-    "ytd_note": "Se usa corte YTD hasta el último mes disponible del año seleccionado.",
 }
+
+# -----------------------------------------------------------------------------
+# Acciones recomendadas (usadas en el plan de acción)
+# -----------------------------------------------------------------------------
+ACTION_LIBRARY = {
+    "volume_recovery": {"label": "Recuperación de volumen"},
+    "monetization": {"label": "Monetización"},
+    "stabilization": {"label": "Estabilización"},
+    "channel_capture": {"label": "Captura de canal"},
+    "premium_mix": {"label": "Mix premium"},
+}
+
+# -----------------------------------------------------------------------------
+# Valores por defecto para la simulación
+# -----------------------------------------------------------------------------
+SIMULATION_DEFAULTS = {
+    "volume_growth_pct": 5.0,
+    "share_capture_pp": 5.0,
+    "rpc_uplift_pct": 5.0,
+}
+
+# -----------------------------------------------------------------------------
+# Límites para la tabla de oportunidades
+# -----------------------------------------------------------------------------
+MAX_TOP_OPPORTUNITIES = 10
