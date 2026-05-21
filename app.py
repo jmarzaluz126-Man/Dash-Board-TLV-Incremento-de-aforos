@@ -458,7 +458,17 @@ def build_opportunities(diag_df):
             return ACTION_LIBRARY["monetization"]["label"], "Ingreso por cruce por debajo del benchmark."
         if pd.notna(row["volatility"]) and row["volatility"] > work["volatility"].median():
             return ACTION_LIBRARY["stabilization"]["label"], "Alta variabilidad mensual."
-        if pd.notna(row["pase_share"]) and row["pase_share"] > 0.20:
+        def recommend(row):
+    pase_share = row.get("pase_share", np.nan)
+    televia_share = row.get("televia_share", np.nan)
+
+    if pd.notna(pase_share) and pase_share > 0.20:
+        return "Oportunidad PASE"
+    
+    if pd.notna(televia_share) and televia_share < 0.30:
+        return "Potencial TeleVía"
+    
+    return "OK"
             return ACTION_LIBRARY["channel_capture"]["label"], "Participación PASE relevante; oportunidad de captura."
         if pd.notna(row["televia_share"]) and row["televia_share"] < 0.25 and row["aforo"] >= work["aforo"].median():
             return ACTION_LIBRARY["premium_mix"]["label"], "Mix TeleVía bajo para una base relevante."
