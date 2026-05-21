@@ -1,5 +1,4 @@
-
-       # app.py
+# app.py
 from datetime import datetime
 from pathlib import Path
 import re
@@ -988,4 +987,3 @@ st.markdown(
     f"Última actualización: {datetime.now().strftime('%d/%m/%Y %H:%M')} · Fuente: {EXCEL_FILE}"
     f"</div>",
     unsafe_allow_html=True,
-)
