@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # App metadata
 # -----------------------------------------------------------------------------
-APP_TITLE = "Dashboard TeleVía - Incremento de Aforos"
+APP_TITLE = "Dashboard TeleVía - Incremento de MS"
 APP_SUBTITLE = "Plataforma de Decision Intelligence para crecimiento de market share"
 
 # -----------------------------------------------------------------------------
