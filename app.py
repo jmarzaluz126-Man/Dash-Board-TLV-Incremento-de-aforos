@@ -653,7 +653,8 @@ family_year = (
     .agg(aforo=("aforo", "sum"), ingreso=("ingreso", "sum"))
     .sort_values("aforo", ascending=False)
 )
-family_year["share"] = family_year["aforo"] / family_year["aforo"].sum().replace(0, np.nan)
+total_family = family_year["aforo"].sum()
+family_year["share"] = family_year["aforo"] / total_family if total_family else np.nan
 
 heatmap_df = build_heatmap(analysis_df, selected_year)
 opportunities_df = build_opportunities(
