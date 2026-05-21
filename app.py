@@ -363,5 +363,3 @@ FINALEOF
 echo "✓ app.py reescrito y corregido"
 Salida
 
-✓ app.py reescrito y corregido
-Listo
