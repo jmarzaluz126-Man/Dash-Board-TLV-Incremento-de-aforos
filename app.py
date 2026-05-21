@@ -661,6 +661,30 @@ concession_monthly_vol = (
 concession_monthly_vol["volatility"] = concession_monthly_vol["std"] / concession_monthly_vol["mean"].replace(0, np.nan)
 conc_diag = conc_diag.merge(concession_monthly_vol[["concession", "volatility"]], on="concession", how="left")
 
+# =============================================================================
+# FIX: Agregar columnas de share de familias (televia_share, pase_share) a conc_diag
+# =============================================================================
+family_shares = (
+    current_ytd_df.groupby(["concession", "family"], as_index=False)
+    .agg(aforo=("aforo", "sum"))
+    .pivot(index="concession", columns="family", values="aforo")
+    .fillna(0)
+)
+for fam in CHANNEL_ORDER:
+    if fam not in family_shares.columns:
+        family_shares[fam] = 0
+family_shares = family_shares[CHANNEL_ORDER]
+family_shares["family_total"] = family_shares.sum(axis=1)
+family_shares["televia_share"] = family_shares["TeleVía"] / family_shares["family_total"].replace(0, np.nan)
+family_shares["pase_share"] = family_shares["PASE"] / family_shares["family_total"].replace(0, np.nan)
+conc_diag = conc_diag.merge(
+    family_shares[["televia_share", "pase_share"]],
+    left_on="concession",
+    right_index=True,
+    how="left"
+)
+# =============================================================================
+
 family_year = (
     current_ytd_df.groupby("family", as_index=False)
     .agg(aforo=("aforo", "sum"), ingreso=("ingreso", "sum"))
