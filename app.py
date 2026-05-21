@@ -1,3 +1,4 @@
+cat > /mnt/user-data/outputs/streamlit_app/app.py << 'FINALEOF'
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -358,3 +359,9 @@ color: {COLORS['muted']}; font-size: 0.85rem;'>
     {datetime.now().strftime('%d/%m/%Y %H:%M')} | {EXCEL_FILE}
 </div>
 """, unsafe_allow_html=True)
+FINALEOF
+echo "✓ app.py reescrito y corregido"
+Salida
+
+✓ app.py reescrito y corregido
+Listo
