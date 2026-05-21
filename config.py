@@ -1,117 +1,154 @@
-# config.py
-# Configuración centralizada del dashboard de aforos TeleVía
+APP_TITLE = "TeleVía | Decision Dashboard"
+APP_SUBTITLE = "Aforo, ingreso, captura de mercado y simulación de crecimiento"
 
 EXCEL_FILE = "dashboard_televia.xlsx"
-
-APP_TITLE = "TeleVía | Decision Dashboard"
-APP_SUBTITLE = "Executive Summary · Diagnóstico · Simulación · Plan de Acción · Seguimiento"
 
 PAGE_TITLES = {
     "home": "1. Executive Summary",
     "diagnostico": "2. Diagnóstico",
     "simulacion": "3. Simulación",
-    "plan": "4. Plan de Acción",
+    "plan": "4. Plan de acción",
     "seguimiento": "5. Seguimiento",
 }
 
 MONTHS = [
-    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    "ENERO",
+    "FEBRERO",
+    "MARZO",
+    "ABRIL",
+    "MAYO",
+    "JUNIO",
+    "JULIO",
+    "AGOSTO",
+    "SEPTIEMBRE",
+    "OCTUBRE",
+    "NOVIEMBRE",
+    "DICIEMBRE",
 ]
 
 MONTH_MAP = {m: i + 1 for i, m in enumerate(MONTHS)}
 
-# Paleta corporativa limpia
 COLORS = {
-    "navy": "#1B2A4A",
-    "blue": "#2563EB",
     "televia": "#2E7D32",
-    "televia_light": "#E8F5E9",
-    "pase": "#8A8A8A",
-    "pase_light": "#F3F4F6",
+    "televia_light": "#A5D6A7",
+    "pase": "#757575",
+    "warning": "#F59E0B",
+    "danger": "#D32F2F",
     "info": "#1976D2",
     "success": "#16A34A",
-    "warning": "#D97706",
-    "danger": "#DC2626",
-    "muted": "#64748B",
+    "navy": "#1B2A4A",
     "bg": "#F8FAFC",
-    "card": "#FFFFFF",
-    "border": "#E2E8F0",
-    "grid": "#E5E7EB",
+    "grid": "#E2E8F0",
+    "muted": "#64748B",
+    "white": "#FFFFFF",
+    "purple": "#7C3AED",
 }
 
-# Umbrales de lectura ejecutiva
-THRESHOLDS = {
-    "good": 8.0,
-    "watch": 6.5,
-}
-
-# Patrones para filtrar bloques de soporte / acumulados
-# Por defecto el dashboard trabaja con concesiones operativas.
-EXCLUDE_TITLE_PATTERNS = [
-    r"ACUMULADO",
-    r"INTEROPERABILIDAD",
-    r"MIS EN MIS",
-    r"MIS EN SUS",
-    r"SUS EN MIS",
-    r"TOTALES MIS",
-    r"TOTAL DE FACTURACION",
-    r"TOTAL DE MIS EN MIS Y MIS EN SUS",
-    r"TRAFICO TOTAL",
-    r"TOTAL\b",
-]
-
-# Grupos de canales para análisis resumido
-CHANNEL_GROUPS = {
-    "Prepago": ["PREPAGO"],
-    "Post-pago": ["POST-PAGO", "POSPAGO"],
-    "Decenal": ["DECENAL"],
-    "TeleVía": ["TELEVIA"],
-    "I+D": ["I+D", "OTRAS I+D"],
-    "CAPUFE": ["CAPUFE", "OTRAS CAPUFE", "CAPUFE-BANOBRAS", "CAPUFE-BANOBRAS (VET)", "CAPUFE-CD VALLES", "CAPUFE-CHAMAPA"],
-    "PINFRA": ["PINFRA", "OTRAS PINFRA", "PINFRA (OSIPASS)"],
-    "SITEL": ["SITEL", "OTRAS SITEL"],
-    "EASYTRIP": ["EASYTRIP"],
-    "Exentos/AUDI": ['EXENTOS', '"AUDI"'],
-    "Totales": ["TOTALES", "TOTAL", "TOTALES MIS EN SUS", "TOTALES MIS EN MIS Y SUS EN MIS"],
+# Grupos de canales para análisis y visualización.
+# La función de clasificación en app.py usa estas reglas en orden.
+CHANNEL_RULES = {
+    "TeleVía": [
+        "TELEVIA",
+        "PREPAGO",
+        "POST-PAGO",
+        "POSPAGO",
+        "DECENAL",
+        "I+D",
+        "MIS EN MIS",
+        "MIS EN SUS",
+        "SUS EN MIS",
+    ],
+    "PASE": [
+        "AUSUR (PASE)",
+        "AUSUR",
+        "CHAMAPA Y OTRAS (PASE)",
+        "CHAMAPA Y OTRAS",
+        "PASE",
+    ],
+    "CAPUFE/Exentos": [
+        "CAPUFE-BANOBRAS",
+        "CAPUFE-CD VALLES",
+        "CAPUFE-CHAMAPA",
+        "CAPUFE",
+        "CEP-SICE",
+        "EXENTOS",
+        "AUDI",
+        "OTRAS CAPUFE",
+        "OTRAS I+D",
+    ],
+    "PINFRA": [
+        "PINFRA (OSIPASS)",
+        "PINFRA",
+        "OTRAS PINFRA",
+    ],
+    "SITEL": [
+        "SITEL",
+        "OTRAS SITEL",
+    ],
+    "EASYTRIP": [
+        "EASYTRIP",
+    ],
     "Otros": [],
 }
 
 CHANNEL_ORDER = [
-    "Prepago", "Post-pago", "Decenal", "TeleVía", "I+D",
-    "CAPUFE", "PINFRA", "SITEL", "EASYTRIP", "Exentos/AUDI", "Totales", "Otros"
+    "TeleVía",
+    "PASE",
+    "CAPUFE/Exentos",
+    "PINFRA",
+    "SITEL",
+    "EASYTRIP",
+    "Otros",
+    "Totales",
 ]
 
-# Supuestos de simulación (solo defaults; el usuario puede moverlos)
+# Títulos que no representan una concesión operativa sino bloques de control/totalización.
+EXCLUDE_TITLE_PATTERNS = [
+    "ACUMULADO",
+    "INTEROPERABILIDAD",
+    "TOTALES",
+    "TOTAL DE FACTURACION",
+    "Trafico Total",
+    "Trafico Facturable",
+]
+
 SIMULATION_DEFAULTS = {
     "volume_growth_pct": 5.0,
-    "share_capture_pp": 2.0,
+    "share_capture_pp": 1.5,
     "rpc_uplift_pct": 3.0,
-    "target_year": 2026,
 }
 
-# Librería básica de acciones para el plan de acción
+MAX_TOP_OPPORTUNITIES = 12
+
 ACTION_LIBRARY = {
     "volume_recovery": {
         "label": "Recuperación de volumen",
-        "hint": "Concesión con volumen relevante y caída / estancamiento.",
+        "description": "La base es relevante, pero el aforo cayó vs. el año previo.",
     },
     "monetization": {
-        "label": "Monetización / pricing",
-        "hint": "Ingresos por cruce por debajo del benchmark del portafolio.",
+        "label": "Monetización",
+        "description": "El ingreso por cruce está por debajo del benchmark.",
     },
     "stabilization": {
-        "label": "Estabilización operativa",
-        "hint": "Alta volatilidad o dispersión en el desempeño mensual.",
+        "label": "Estabilización",
+        "description": "La variabilidad mensual es alta y debe controlarse.",
     },
     "channel_capture": {
         "label": "Captura de canal",
-        "hint": "Aumentar participación de un canal con potencial.",
+        "description": "Hay oportunidad para ganar participación en canales clave.",
     },
     "premium_mix": {
-        "label": "Mejorar mix premium",
-        "hint": "Subir el peso de canales de mayor ingreso por cruce.",
+        "label": "Mix premium",
+        "description": "El mix puede migrar hacia canales de mayor valor.",
+    },
+    "benchmark": {
+        "label": "Replicar benchmark",
+        "description": "Hay una concesión líder que puede servir como referencia.",
     },
 }
 
-MAX_TOP_OPPORTUNITIES = 10
+TEXT_HELP = {
+    "scope_operational": "Solo concesiones operativas",
+    "scope_all": "Incluir bloques de control",
+    "ytd_note": "Se usa corte YTD hasta el último mes disponible del año seleccionado.",
+}
