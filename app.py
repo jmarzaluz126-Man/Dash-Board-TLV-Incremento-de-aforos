@@ -436,6 +436,12 @@ def build_opportunities(diag_df):
         return diag_df
 
     work = diag_df.copy()
+    # Asegurar que las columnas necesarias existan
+    required_cols = ["aforo", "rpc", "aforo_yoy", "volatility", "pase_share", "televia_share"]
+    for col in required_cols:
+        if col not in work.columns:
+            work[col] = np.nan
+
     work["max_aforo"] = work["aforo"].max()
     work["median_rpc"] = work["rpc"].median()
 
@@ -628,7 +634,6 @@ conc_year = (
 )
 conc_year["rpc"] = conc_year["ingreso"] / conc_year["aforo"].replace(0, np.nan)
 
-# Fixed: safe share calculation avoiding scalar replace and undefined variable
 total_aforo = conc_year["aforo"].sum()
 conc_year["share_aforo"] = conc_year["aforo"] / total_aforo if total_aforo != 0 else np.nan
 
@@ -656,25 +661,36 @@ family_year = (
     .agg(aforo=("aforo", "sum"), ingreso=("ingreso", "sum"))
     .sort_values("aforo", ascending=False)
 )
-total_aforo_family = family_year["aforo"].sum()
-family_year["share"] = family_year["aforo"] / total_aforo_family if total_aforo_family != 0 else np.nan
+total_family_aforo = family_year["aforo"].sum()
+family_year["share"] = family_year["aforo"] / total_family_aforo if total_family_aforo != 0 else np.nan
 
 heatmap_df = build_heatmap(analysis_df, selected_year)
+
+# Preparar DataFrame para oportunidades con las columnas de familias
+family_pivot = (
+    current_ytd_df.groupby(["concession", "family"], as_index=False)
+    .agg(aforo=("aforo", "sum"))
+    .pivot(index="concession", columns="family", values="aforo")
+    .fillna(0)
+)
+# Asegurar que todas las familias necesarias existan
+for fam in CHANNEL_ORDER:
+    if fam not in family_pivot.columns:
+        family_pivot[fam] = 0
+family_pivot = family_pivot[CHANNEL_ORDER]
+family_pivot["televia_share"] = family_pivot["TeleVía"] / family_pivot.sum(axis=1).replace(0, np.nan)
+family_pivot["pase_share"] = family_pivot["PASE"] / family_pivot.sum(axis=1).replace(0, np.nan)
+
 opportunities_df = build_opportunities(
     conc_diag.merge(
-        (
-            current_ytd_df.groupby(["concession", "family"], as_index=False)
-            .agg(aforo=("aforo", "sum"))
-            .pivot(index="concession", columns="family", values="aforo")
-            .fillna(0)
-        ),
+        family_pivot,
         left_on="concession",
         right_index=True,
         how="left",
     )
 )
 
-# normalize family share columns if present
+# normalize family share columns if present (ya están, pero por si acaso)
 for fam in ["TeleVía", "PASE", "CAPUFE/Exentos", "PINFRA", "SITEL", "EASYTRIP", "Otros", "Totales"]:
     if fam not in opportunities_df.columns:
         opportunities_df[fam] = 0
@@ -1022,22 +1038,10 @@ with tab_sim:
 with tab_plan:
     st.subheader("Plan de acción")
 
-    opportunities = build_opportunities(
-        conc_diag.merge(
-            current_ytd_df.groupby(["concession", "family"], as_index=False)
-            .agg(aforo=("aforo", "sum"))
-            .pivot(index="concession", columns="family", values="aforo")
-            .fillna(0),
-            left_on="concession",
-            right_index=True,
-            how="left",
-        )
-    )
-
-    if opportunities.empty:
+    if opportunities_df.empty:
         st.info("No hay datos suficientes para construir un plan de acción.")
     else:
-        top_opp = opportunities.head(MAX_TOP_OPPORTUNITIES).copy()
+        top_opp = opportunities_df.head(MAX_TOP_OPPORTUNITIES).copy()
         top_opp["priority_score"] = top_opp["priority_score"].round(2)
 
         st.markdown("##### Oportunidades prioritarias")
